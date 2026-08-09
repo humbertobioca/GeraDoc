@@ -10,6 +10,7 @@ import Logo from './components/Logo.jsx';
 import DialogHost from './components/Dialog.jsx';
 import AppMenu from './components/AppMenu.jsx';
 import IconButton from './components/IconButton.jsx';
+import SaveStatus from './components/SaveStatus.jsx';
 import {
   IconCapture,
   IconExport,
@@ -49,6 +50,7 @@ export default function App() {
   const [exporting, setExporting] = useState(null);
   const [sidebar, setSidebar] = useState(500);
   const [psConflict, setPsConflict] = useState(false);
+  const [saveState, setSaveState] = useState('new'); // new | saving | draft | saved | error
   const [update, setUpdate] = useState({ status: 'idle' });
   const pendingTarget = useRef(null);
   const ready = useRef(false); // evita gravar preferências antes de carregá-las
@@ -204,20 +206,36 @@ export default function App() {
   );
 
   // ------------------------------------------------------------ salvamento automático
+  //
   // Com um arquivo .evid aberto, cada alteração vai direto para ele. Sem
-  // arquivo ainda, o trabalho fica no rascunho interno até o primeiro "Salvar".
+  // arquivo ainda, o trabalho fica num rascunho temporário até o primeiro
+  // "Salvar".
+  //
+  // `dirty` continua verdadeiro enquanto não houver arquivo — é ele que faz o
+  // app perguntar antes de fechar. Por isso o indicador visual tem estado
+  // próprio: senão ficaria preso em "salvando…" para sempre.
   useEffect(() => {
-    if (!dirty) return;
+    if (!dirty) {
+      setSaveState(filePath ? 'saved' : 'new');
+      return;
+    }
+
+    setSaveState('saving');
     const id = setTimeout(async () => {
       const json = JSON.stringify(project);
       try {
         if (filePath) {
           await window.api.saveProject({ json, filePath });
           useStore.getState().markSaved();
+          setSaveState('saved');
         } else {
           await window.api.autosave(json);
+          setSaveState('draft');
         }
-      } catch { /* disco cheio ou arquivo em uso: tenta de novo na próxima mudança */ }
+      } catch (err) {
+        setSaveState('error');
+        console.error('[GeraDoc] falha ao salvar:', err);
+      }
     }, 1200);
     return () => clearTimeout(id);
   }, [project, dirty, filePath]);
@@ -455,13 +473,11 @@ export default function App() {
           <Logo />
           <div className="brand-text">
             <strong>GeraDoc</strong>
-            <small title={filePath || 'ainda não salvo em arquivo'}>
-              {filePath ? filePath.split(/[\\/]/).pop() : 'sem arquivo'}
-              {dirty ? (
-                <span className="unsaved"> • salvando…</span>
-              ) : filePath ? (
-                <span className="saved"> • salvo</span>
-              ) : null}
+            <small>
+              <span className="doc-name">
+                {filePath ? filePath.split(/[\\/]/).pop() : 'documento sem nome'}
+              </span>
+              <SaveStatus state={saveState} filePath={filePath} />
             </small>
           </div>
         </div>

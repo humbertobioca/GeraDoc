@@ -1,53 +1,18 @@
-import React, { useRef, useState } from 'react';
+import React from 'react';
+import Tooltip from './Tooltip.jsx';
 
-/**
- * Botão só com ícone. O rótulo aparece num balão ao passar o mouse — o
- * `title` do navegador demora quase um segundo e não acompanha o visual
- * do app.
- */
-export default function IconButton({
-  icon,
-  label,
-  hint,
-  onClick,
-  disabled,
-  active,
-  className = '',
-}) {
-  const [open, setOpen] = useState(false);
-  const timer = useRef(null);
-
-  const show = () => {
-    clearTimeout(timer.current);
-    timer.current = setTimeout(() => setOpen(true), 320);
-  };
-  const hide = () => {
-    clearTimeout(timer.current);
-    setOpen(false);
-  };
-
+/** Botão só com ícone; o rótulo aparece num balão ao passar o mouse. */
+export default function IconButton({ icon, label, hint, onClick, disabled, active, className = '' }) {
   return (
-    <span className="tip-wrap" onMouseEnter={show} onMouseLeave={hide}>
+    <Tooltip label={label} hint={hint} disabled={disabled}>
       <button
         className={`iconbtn ${active ? 'on' : ''} ${className}`}
-        onClick={(e) => {
-          hide();
-          onClick?.(e);
-        }}
-        onFocus={show}
-        onBlur={hide}
+        onClick={onClick}
         disabled={disabled}
         aria-label={label}
       >
         {icon}
       </button>
-
-      {open && !disabled ? (
-        <span className="tooltip" role="tooltip">
-          {label}
-          {hint ? <em>{hint}</em> : null}
-        </span>
-      ) : null}
-    </span>
+    </Tooltip>
   );
 }

@@ -44,11 +44,21 @@ button, input, select, textarea { font-family: inherit; font-size: inherit; }
 .brand-text { min-width: 0; }
 .brand strong { display: block; font-size: 13px; line-height: 1.25; white-space: nowrap; }
 .brand small {
-  color: var(--fg2); font-size: 11px; display: block;
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  color: var(--fg2); font-size: 11px;
+  display: flex; align-items: center; gap: 6px; min-width: 0;
 }
-.unsaved { color: var(--warn); }
-.saved { color: var(--ok); }
+.doc-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+
+/* estado do salvamento, em ícone */
+.save-status { display: inline-grid; place-items: center; flex: 0 0 auto; }
+.save-status.ok { color: var(--ok); }
+.save-status.draft { color: var(--warn); }
+.save-status.err { color: var(--err); }
+.mini-spinner {
+  width: 11px; height: 11px; border-radius: 50%;
+  border: 1.7px solid rgba(255, 255, 255, .18); border-top-color: var(--accent);
+  animation: spin .7s linear infinite;
+}
 
 /* minimizar / maximizar / fechar */
 .win-ctl { display: flex; align-self: stretch; margin-left: 4px; -webkit-app-region: no-drag; }

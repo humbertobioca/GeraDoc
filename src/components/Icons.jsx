@@ -112,6 +112,20 @@ export const IconRedo = (p) => (
   </Svg>
 );
 
+export const IconDraft = (p) => (
+  <Svg {...p}>
+    <circle cx="12" cy="12" r="9" />
+    <path d="M12 7.5V12l3 2" />
+  </Svg>
+);
+
+export const IconAlert = (p) => (
+  <Svg {...p}>
+    <path d="M10.3 3.9 2.4 17.5A2 2 0 0 0 4.1 20.5h15.8a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z" />
+    <path d="M12 9v4.5M12 17h.01" />
+  </Svg>
+);
+
 export const IconCheck = (p) => (
   <Svg {...p}>
     <path d="m5 12.5 4.5 4.5L19 7" />
