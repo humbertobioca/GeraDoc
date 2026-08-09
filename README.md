@@ -166,34 +166,54 @@ Como o instalador é por usuário, a atualização também **não pede administr
 
 ### Publicando uma versão nova
 
-1. Suba o `version` no `package.json` (ex.: `1.0.0` → `1.1.0`).
-2. `npm run dist` — além dos `.exe`, isso gera `release/latest.yml`, que é o
-   arquivo que o app consulta para saber se há novidade.
-3. Publique **`latest.yml`**, o `GeraDoc-<versão>-Instalador.exe` e o
-   `.exe.blockmap` no mesmo endereço.
+As releases saem do **GitHub Releases** deste repositório. O jeito recomendado é
+deixar o GitHub compilar:
 
-O `blockmap` permite atualização diferencial: o app baixa só o que mudou, em vez
-dos 80 MB inteiros.
-
-### Onde hospedar
-
-O endereço fica em `build.publish` no `package.json`. Hoje está um placeholder:
-
-```json
-"publish": [{ "provider": "generic", "url": "https://exemplo.com/geradoc/" }]
+```bash
+npm version 1.1.0
 ```
 
-Troque por um destes:
+```bash
+git push origin main --follow-tags
+```
 
-- **Servidor HTTP interno / IIS / nginx** — mais simples numa rede corporativa.
-  Basta uma pasta servindo os três arquivos.
-- **GitHub Releases** — grátis. Use
-  `"publish": [{ "provider": "github", "owner": "seu-usuario", "repo": "geradoc" }]`
-  e publique com `GH_TOKEN=... npx electron-builder --publish always`.
-  Em repositório privado é preciso embutir um token no app, o que não é ideal.
+O `npm version` sobe o número no `package.json`, cria o commit e a tag `v1.1.0`.
+Ao chegar a tag, o workflow [release.yml](.github/workflows/release.yml) compila
+no Windows e publica na aba **Releases**: o instalador, o portátil, o
+`latest.yml` e o `.blockmap`.
+
+É o `latest.yml` que o app consulta para saber se há versão nova, e o `blockmap`
+que permite baixar só o que mudou em vez dos 80 MB inteiros.
+
+A release nasce como **rascunho**? Não — sai publicada direto. Para revisar antes,
+troque `releaseType` para `draft` em `build.publish` no `package.json` e clique
+em "Publish release" na interface do GitHub quando estiver pronto.
+
+O workflow confere se a tag bate com a versão do `package.json` e falha cedo se
+estiverem diferentes.
+
+### Publicando da sua máquina, sem o GitHub Actions
+
+Precisa de um token com escopo `repo`
+([criar aqui](https://github.com/settings/tokens/new?scopes=repo)):
+
+```bash
+GH_TOKEN=seu_token npm run release
+```
+
+Nunca coloque o token no `package.json` nem em qualquer arquivo do repositório —
+use variável de ambiente.
+
+### Outros destinos
+
+Se um dia precisar sair do GitHub, troque `build.publish` no `package.json`:
+
+- **Servidor HTTP interno / IIS / nginx** —
+  `{ "provider": "generic", "url": "https://servidor/geradoc/" }`. Basta uma
+  pasta servindo `latest.yml`, o instalador e o blockmap.
 - **Amazon S3 / Azure Blob** — `"provider": "s3"` ou `"azureBlob"`.
 
-Para apontar um endereço diferente sem recompilar, preencha `updateFeedUrl` no
+Para apontar outro endereço sem recompilar, preencha `updateFeedUrl` no
 `prefs.json`; ele tem prioridade sobre o `package.json`.
 
 ### Limites que valem saber
