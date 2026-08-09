@@ -180,6 +180,7 @@ export default function ContentPanel({ onCapture, onEditImage }) {
   const setCaseStatus = useStore((s) => s.setCaseStatus);
   const setCoverValue = useStore((s) => s.setCoverValue);
   const addStep = useStore((s) => s.addStep);
+  const askDialog = useStore((s) => s.askDialog);
 
   const t = project.template;
   const coverFields = t.coverFields.filter((f) => f.show);
@@ -212,7 +213,20 @@ export default function ContentPanel({ onCapture, onEditImage }) {
                   <button
                     className="ico danger"
                     title="Excluir"
-                    onClick={(e) => { e.stopPropagation(); if (confirm('Excluir este caso de teste?')) removeCase(c.id); }}
+                    onClick={async (e) => {
+                      e.stopPropagation();
+                      const { response } = await askDialog({
+                        type: 'warning',
+                        title: 'Excluir caso de teste',
+                        message: `Excluir "${c.values.codigo || 'este caso'}"?`,
+                        detail: `${c.steps.length} passo(s) e suas evidências serão perdidos.`,
+                        buttons: ['Excluir', 'Cancelar'],
+                        defaultId: 0,
+                        cancelId: 1,
+                        danger: true,
+                      });
+                      if (response === 0) removeCase(c.id);
+                    }}
                   >✕</button>
                 </span>
               </div>

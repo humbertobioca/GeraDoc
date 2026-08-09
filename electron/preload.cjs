@@ -32,6 +32,15 @@ contextBridge.exposeInMainWorld('api', {
   cancelOverlay: () => ipcRenderer.send('overlay:cancel'),
   focusOverlay: () => ipcRenderer.send('overlay:focus'),
 
+  // caixas de diálogo desenhadas pela interface
+  onDialogRequest: (cb) => {
+    const h = (_e, payload) => cb(payload);
+    ipcRenderer.on('dialog:ask', h);
+    return () => ipcRenderer.removeListener('dialog:ask', h);
+  },
+  dialogShown: (id) => ipcRenderer.send('dialog:shown', id),
+  dialogAnswer: (payload) => ipcRenderer.send('dialog:answer', payload),
+
   docInfo: () => ipcRenderer.invoke('doc:info'),
   reportDocState: (st) => ipcRenderer.send('doc:state', st),
   onRequestSave: (cb) => {

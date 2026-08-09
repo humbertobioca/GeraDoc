@@ -7,6 +7,7 @@ import Annotator from './components/Annotator.jsx';
 import { ProfileSwitch } from './components/ui.jsx';
 import WindowControls from './components/WindowControls.jsx';
 import Logo from './components/Logo.jsx';
+import DialogHost from './components/Dialog.jsx';
 import { exportPdf, slug } from './export/exportPdf.js';
 import { buildDocx } from './export/exportDocx.js';
 import { coverValue } from './doc/blocks.jsx';
@@ -126,6 +127,17 @@ export default function App() {
     document.title = nome ? `${nome} — GeraDoc` : 'GeraDoc';
     window.api.reportDocState({ filePath, dirty });
   }, [filePath, dirty]);
+
+  // ---- diálogos pedidos pelo processo principal são desenhados aqui
+  useEffect(
+    () =>
+      window.api.onDialogRequest(async ({ id, ...options }) => {
+        window.api.dialogShown(id);
+        const { response, checkboxChecked } = await useStore.getState().askDialog(options);
+        window.api.dialogAnswer({ id, response, checkboxChecked });
+      }),
+    [],
+  );
 
   // ---- estado da atualização
   useEffect(() => {
@@ -587,7 +599,14 @@ export default function App() {
         />
       ) : null}
 
-      {toast ? <div className={`toast ${toast.kind}`}>{toast.message}</div> : null}
+      <DialogHost />
+
+      {toast ? (
+        <div className={`toast ${toast.kind}`}>
+          <span className="toast-ic" />
+          {toast.message}
+        </div>
+      ) : null}
     </div>
   );
 }

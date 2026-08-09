@@ -112,6 +112,31 @@ export const useStore = create((set, get) => ({
     });
   },
 
+  /**
+   * Caixa de diálogo com o visual do app, no lugar da nativa do sistema.
+   * Devolve { response, checkboxChecked } — mesmo formato do dialog do Electron,
+   * para o processo principal poder usar sem tradução.
+   */
+  dialog: null,
+
+  askDialog(options) {
+    return new Promise((resolve) => {
+      set({ dialog: { id: uid(), checkboxChecked: false, ...options, resolve } });
+    });
+  },
+
+  answerDialog(response) {
+    const d = get().dialog;
+    if (!d) return;
+    set({ dialog: null });
+    d.resolve({ response, checkboxChecked: !!d.checkboxChecked });
+  },
+
+  toggleDialogCheckbox() {
+    const d = get().dialog;
+    if (d) set({ dialog: { ...d, checkboxChecked: !d.checkboxChecked } });
+  },
+
   notify(message, kind = 'info') {
     set({ toast: { message, kind, id: uid() } });
     setTimeout(() => {

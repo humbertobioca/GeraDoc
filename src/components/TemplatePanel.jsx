@@ -120,6 +120,7 @@ function TemplateLibrary() {
   const template = useStore((s) => s.project.template);
   const replaceTemplate = useStore((s) => s.replaceTemplate);
   const notify = useStore((s) => s.notify);
+  const askDialog = useStore((s) => s.askDialog);
   const [list, setList] = useState([]);
   const [name, setName] = useState('');
 
@@ -171,7 +172,17 @@ function TemplateLibrary() {
               <button
                 className="btn tiny ghost"
                 onClick={async () => {
-                  if (!confirm(`Excluir o template "${n}"?`)) return;
+                  const { response } = await askDialog({
+                    type: 'warning',
+                    title: 'Excluir template',
+                    message: `Excluir o template "${n}"?`,
+                    detail: 'Os documentos que já usam este template não são afetados.',
+                    buttons: ['Excluir', 'Cancelar'],
+                    defaultId: 0,
+                    cancelId: 1,
+                    danger: true,
+                  });
+                  if (response !== 0) return;
                   await window.api.deleteTemplate(n);
                   refresh();
                 }}
@@ -185,10 +196,18 @@ function TemplateLibrary() {
           <button className="btn" onClick={() => window.api.openTemplatesFolder()}>Abrir pasta</button>
           <button
             className="btn ghost"
-            onClick={() => {
-              if (confirm('Restaurar o template padrão? As personalizações atuais serão perdidas.')) {
-                replaceTemplate(defaultTemplate());
-              }
+            onClick={async () => {
+              const { response } = await askDialog({
+                type: 'warning',
+                title: 'Restaurar template padrão',
+                message: 'Descartar as personalizações do template atual?',
+                detail: 'Fontes, cores, margens, capa, campos e seções voltam ao padrão. O conteúdo dos casos de teste não é afetado.',
+                buttons: ['Restaurar', 'Cancelar'],
+                defaultId: 1,
+                cancelId: 1,
+                danger: true,
+              });
+              if (response === 0) replaceTemplate(defaultTemplate());
             }}
           >
             Restaurar padrão

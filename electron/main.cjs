@@ -189,6 +189,57 @@ function createWindow({ docId = uid(), open = null } = {}) {
   return win;
 }
 
+// ---------------------------------------------------------------- diálogos
+
+/** Pedidos de diálogo aguardando resposta da interface. */
+const dialogWaiters = new Map();
+let dialogSeq = 0;
+
+/**
+ * Mostra a caixa de diálogo desenhada pela própria interface, para o visual
+ * combinar com o resto do app.
+ *
+ * A interface confirma o recebimento em `dialog:shown`. Se essa confirmação não
+ * vier — renderer travado ou ainda carregando — cai para a caixa nativa, senão
+ * o usuário ficaria sem resposta nenhuma.
+ */
+function askDialog(win, options) {
+  if (!win || win.isDestroyed()) return dialog.showMessageBox(options);
+
+  return new Promise((resolve) => {
+    const id = ++dialogSeq;
+    let shown = false;
+
+    const fallback = setTimeout(async () => {
+      if (!shown && dialogWaiters.delete(id)) {
+        resolve(await dialog.showMessageBox(win, options));
+      }
+    }, 2500);
+
+    dialogWaiters.set(id, {
+      ack: () => {
+        shown = true;
+        clearTimeout(fallback);
+      },
+      done: (answer) => {
+        clearTimeout(fallback);
+        resolve(answer);
+      },
+    });
+
+    win.webContents.send('dialog:ask', { id, ...options });
+  });
+}
+
+ipcMain.on('dialog:shown', (_e, id) => dialogWaiters.get(id)?.ack());
+
+ipcMain.on('dialog:answer', (_e, { id, response, checkboxChecked }) => {
+  const w = dialogWaiters.get(id);
+  if (!w) return;
+  dialogWaiters.delete(id);
+  w.done({ response, checkboxChecked: !!checkboxChecked });
+});
+
 // ---------------------------------------------------------------- salvar e fechar
 
 /**
@@ -232,7 +283,7 @@ ipcMain.on('doc:state', (e, st) => {
 });
 
 async function confirmClose(win, docId) {
-  const { response } = await dialog.showMessageBox(win, {
+  const { response } = await askDialog(win, {
     type: 'warning',
     noLink: true,
     buttons: ['Salvar', 'Não salvar', 'Cancelar'],
@@ -501,7 +552,7 @@ async function chooseTarget(kind, parentWin) {
 
   if (!prefs.get(askKey)) return prefs.get(targetKey) || 'current';
 
-  const { response, checkboxChecked } = await dialog.showMessageBox(parentWin, {
+  const { response, checkboxChecked } = await askDialog(parentWin, {
     type: 'question',
     noLink: true,
     buttons: ['Nesta janela', 'Em uma nova janela', 'Cancelar'],
