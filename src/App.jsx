@@ -8,6 +8,17 @@ import { ProfileSwitch } from './components/ui.jsx';
 import WindowControls from './components/WindowControls.jsx';
 import Logo from './components/Logo.jsx';
 import DialogHost from './components/Dialog.jsx';
+import AppMenu from './components/AppMenu.jsx';
+import IconButton from './components/IconButton.jsx';
+import {
+  IconCapture,
+  IconExport,
+  IconPdf,
+  IconRedo,
+  IconSave,
+  IconUndo,
+  IconWord,
+} from './components/Icons.jsx';
 import { exportPdf, slug } from './export/exportPdf.js';
 import { buildDocx } from './export/exportDocx.js';
 import { coverValue } from './doc/blocks.jsx';
@@ -146,10 +157,37 @@ export default function App() {
   );
 
   // ---- estado da atualização
+  //
+  // O download acontece sozinho em segundo plano. Quando termina, o app avisa
+  // e — se você aceitar — salva tudo, instala em silêncio e reabre. Recusando,
+  // a instalação entra sozinha no próximo fechamento.
+  const updateAsked = useRef(false);
+
   useEffect(() => {
     window.api.updateState().then((s) => s && setUpdate(s));
-    return window.api.onUpdateState(setUpdate);
-  }, []);
+
+    return window.api.onUpdateState(async (s) => {
+      setUpdate(s);
+
+      if (s.status !== 'downloaded' || updateAsked.current) return;
+      updateAsked.current = true;
+
+      const { response } = await useStore.getState().askDialog({
+        type: 'success',
+        title: 'Atualização pronta',
+        message: `A versão ${s.version} já foi baixada.`,
+        detail:
+          'O GeraDoc salva tudo que está aberto, instala sozinho e reabre as mesmas janelas. ' +
+          'Não é preciso executar nenhum instalador.',
+        buttons: ['Atualizar agora', 'Ao fechar o GeraDoc'],
+        defaultId: 0,
+        cancelId: 1,
+      });
+
+      if (response === 0) window.api.installUpdate();
+      else notify('A atualização será aplicada quando você fechar o GeraDoc.', 'ok');
+    });
+  }, [notify]);
 
   // ---- abertura por duplo clique no Explorer (arquivo .evid)
   useEffect(
@@ -336,6 +374,14 @@ export default function App() {
     useStore.getState().resetProject();
   };
 
+  const procurarAtualizacao = async () => {
+    const s = await window.api.checkUpdate();
+    setUpdate(s);
+    if (s.status === 'uptodate') notify('O GeraDoc já está atualizado.', 'ok');
+    else if (s.status === 'dev') notify('Atualização só funciona na versão instalada.', 'warn');
+    else if (s.status === 'error') notify(`Falha ao procurar atualização: ${s.error}`, 'err');
+  };
+
   const doPdf = async () => {
     setExporting('pdf');
     try {
@@ -391,6 +437,20 @@ export default function App() {
   return (
     <div className="app">
       <header className="topbar" onDoubleClick={() => window.api.winToggleMaximize()}>
+        <AppMenu
+          filePath={filePath}
+          exporting={exporting}
+          actions={{
+            novo,
+            abrir: open,
+            salvar: save,
+            salvarComo: saveAs,
+            exportarWord: doDocx,
+            exportarPdf: doPdf,
+            procurarAtualizacao: procurarAtualizacao,
+          }}
+        />
+
         <div className="brand">
           <Logo />
           <div className="brand-text">
@@ -407,29 +467,40 @@ export default function App() {
         </div>
 
         <div className="tb-actions">
-          <div className="tb-group" role="group" aria-label="Arquivo">
-            <button className="btn" onClick={novo} title="Documento novo">Novo</button>
-            <button className="btn" onClick={open} title="Abrir projeto (Ctrl+O)">Abrir</button>
-            <button
-              className="btn"
-              onClick={save}
-              title={filePath ? `Salvar em ${filePath} (Ctrl+S)` : 'Salvar projeto (Ctrl+S)'}
-            >
-              Salvar
-            </button>
-            <button className="btn" onClick={saveAs} title="Salvar como… (Ctrl+Shift+S)">
-              Salvar como…
-            </button>
+          <div className="tb-group">
+            <IconButton icon={<IconUndo />} label="Desfazer" hint="Ctrl+Z" onClick={undo} />
+            <IconButton icon={<IconRedo />} label="Refazer" hint="Ctrl+Y" onClick={redo} />
           </div>
 
-          <div className="tb-group" role="group" aria-label="Captura">
-            <button
-              className="btn primary"
-              title={`Capturar tela (${shortcut.replace('CommandOrControl', 'Ctrl')})`}
+          <div className="tb-group">
+            <IconButton
+              icon={<IconSave />}
+              label={filePath ? 'Salvar' : 'Salvar documento…'}
+              hint="Ctrl+S"
+              onClick={save}
+            />
+            <IconButton
+              icon={<IconWord />}
+              label={exporting === 'docx' ? 'Gerando Word…' : 'Exportar para Word'}
+              onClick={doDocx}
+              disabled={!!exporting}
+            />
+            <IconButton
+              icon={<IconPdf />}
+              label={exporting === 'pdf' ? 'Gerando PDF…' : 'Exportar para PDF'}
+              onClick={doPdf}
+              disabled={!!exporting}
+            />
+          </div>
+
+          <div className="tb-group">
+            <IconButton
+              className="accent"
+              icon={<IconCapture size={18} />}
+              label="Capturar tela"
+              hint={shortcut.replace('CommandOrControl', 'Ctrl')}
               onClick={() => requestCapture({ caseId: active?.id, stepId: null })}
-            >
-              ⛶ Capturar
-            </button>
+            />
             <select
               className="inp shortcut-sel"
               value={shortcut}
@@ -449,28 +520,6 @@ export default function App() {
               ))}
             </select>
           </div>
-
-          <div className="tb-group" role="group" aria-label="Exportar">
-            <button className="btn ok" disabled={!!exporting} onClick={doDocx} title="Gerar documento do Word">
-              {exporting === 'docx' ? 'Gerando…' : '📄 Word'}
-            </button>
-            <button className="btn ok" disabled={!!exporting} onClick={doPdf} title="Gerar PDF">
-              {exporting === 'pdf' ? 'Gerando…' : '📕 PDF'}
-            </button>
-            <button
-              className="ico"
-              title="Procurar atualizações"
-              onClick={async () => {
-                const s = await window.api.checkUpdate();
-                setUpdate(s);
-                if (s.status === 'uptodate') notify('O GeraDoc já está atualizado.', 'ok');
-                else if (s.status === 'dev') notify('Atualização só funciona na versão instalada.', 'warn');
-                else if (s.status === 'error') notify(`Falha ao procurar atualização: ${s.error}`, 'err');
-              }}
-            >
-              ⭯
-            </button>
-          </div>
         </div>
 
         <WindowControls />
@@ -481,29 +530,22 @@ export default function App() {
           <span className="banner-ic">{update.status === 'downloaded' ? '✓' : '⭳'}</span>
           <div className="banner-text">
             {update.status === 'available' && (
-              <>
-                <b>Versão {update.version} disponível.</b> A atualização não apaga seus documentos
-                nem suas preferências.
-              </>
+              <>Versão {update.version} encontrada. Baixando em segundo plano…</>
             )}
             {update.status === 'downloading' && (
               <>
-                Baixando a versão {update.version}… <b>{update.percent}%</b>
+                Baixando a versão {update.version}… <b>{update.percent}%</b> — pode continuar
+                trabalhando.
               </>
             )}
             {update.status === 'downloaded' && (
               <>
-                <b>Versão {update.version} pronta para instalar.</b> O GeraDoc salva tudo que está
-                aberto, atualiza e reabre as mesmas janelas.
+                <b>Versão {update.version} pronta.</b> Será instalada sozinha quando você fechar o
+                GeraDoc.
               </>
             )}
           </div>
 
-          {update.status === 'available' && (
-            <button className="btn tiny primary" onClick={() => window.api.downloadUpdate()}>
-              Baixar agora
-            </button>
-          )}
           {update.status === 'downloading' && (
             <div className="banner-bar">
               <span style={{ width: `${update.percent}%` }} />
@@ -511,14 +553,27 @@ export default function App() {
           )}
           {update.status === 'downloaded' && (
             <button className="btn tiny primary" onClick={() => window.api.installUpdate()}>
-              Reiniciar e atualizar
+              Atualizar agora
             </button>
           )}
           {update.status !== 'downloading' && (
-            <button className="ico" title="Depois" onClick={() => setUpdate({ status: 'idle' })}>
+            <button className="ico" title="Dispensar" onClick={() => setUpdate({ status: 'idle' })}>
               ✕
             </button>
           )}
+        </div>
+      ) : null}
+
+      {update.status === 'installing' ? (
+        <div className="installing">
+          <div className="installing-card">
+            <div className="spinner" />
+            <strong>Atualizando o GeraDoc…</strong>
+            <p>
+              Seu trabalho já foi salvo. O app fecha, instala a versão {update.version} e reabre
+              sozinho com as mesmas janelas. Não feche nada.
+            </p>
+          </div>
         </div>
       ) : null}
 

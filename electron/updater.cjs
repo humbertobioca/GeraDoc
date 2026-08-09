@@ -22,8 +22,12 @@ function setState(patch) {
 }
 
 function configure() {
-  autoUpdater.autoDownload = false;
-  autoUpdater.autoInstallOnAppQuit = false;
+  // Baixa sozinho em segundo plano — o usuário nunca precisa procurar nem
+  // executar o instalador.
+  autoUpdater.autoDownload = true;
+  // Se a atualização não for aplicada na hora, ela entra sozinha (e em
+  // silêncio) no próximo fechamento do app.
+  autoUpdater.autoInstallOnAppQuit = true;
   autoUpdater.logger = null;
   // instalador por usuário: a atualização também não pede administrador
   autoUpdater.allowDowngrade = false;
@@ -70,7 +74,9 @@ async function installAndRestart(sessionOf) {
   await saveEverything();
   prefs.set({ restoreSession: sessionOf() });
   setState({ status: 'installing' });
-  setImmediate(() => autoUpdater.quitAndInstall(false, true));
+  // isSilent = true: roda o instalador com /S, sem assistente nenhum na tela.
+  // isForceRunAfter = true: o app volta sozinho depois de instalado.
+  setImmediate(() => autoUpdater.quitAndInstall(true, true));
 }
 
 function init({ broadcast: b, saveEverything: s, sessionOf }) {
