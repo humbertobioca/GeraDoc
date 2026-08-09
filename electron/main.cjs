@@ -119,7 +119,10 @@ function createWindow({ docId = uid(), open = null } = {}) {
     },
   });
 
-  docWindows.set(win.webContents.id, { docId, win });
+  // Guardado agora: depois de 'closed' o webContents já não existe e qualquer
+  // acesso a ele lança "Object has been destroyed".
+  const wcId = win.webContents.id;
+  docWindows.set(wcId, { docId, win });
 
   if (isDev) win.loadURL('http://localhost:5173');
   else win.loadFile(path.join(__dirname, '..', 'dist', 'index.html'));
@@ -162,7 +165,7 @@ function createWindow({ docId = uid(), open = null } = {}) {
   // Pergunta antes de descartar trabalho não salvo.
   win.on('close', (e) => {
     if (allowedToClose.has(win)) return;
-    const st = docState.get(win.webContents.id);
+    const st = docState.get(wcId);
     if (!st?.dirty) return;
 
     e.preventDefault();
@@ -175,9 +178,9 @@ function createWindow({ docId = uid(), open = null } = {}) {
 
   win.on('closed', () => {
     clearTimeout(boundsTimer);
-    docWindows.delete(win.webContents.id);
-    docState.delete(win.webContents.id);
-    saveWaiters.delete(win.webContents.id);
+    docWindows.delete(wcId);
+    docState.delete(wcId);
+    saveWaiters.delete(wcId);
     if (lastFocused === win) lastFocused = null;
   });
 
@@ -875,6 +878,23 @@ if (!app.requestSingleInstanceLock()) {
     });
   });
 }
+
+/**
+ * Sem isto, qualquer exceção não tratada aqui abre a caixa de erro crua do
+ * Electron, com stack trace, e interrompe o que o usuário estava fazendo.
+ * O erro continua indo para o log — só não vira um susto na tela.
+ */
+process.on('uncaughtException', (err) => {
+  console.error('[GeraDoc] erro não tratado no processo principal:', err);
+  const win = targetWindow();
+  if (win && !win.isDestroyed()) {
+    win.webContents.send('main:error', String(err?.message || err));
+  }
+});
+
+process.on('unhandledRejection', (reason) => {
+  console.error('[GeraDoc] promessa rejeitada sem tratamento:', reason);
+});
 
 app.on('will-quit', () => globalShortcut.unregisterAll());
 app.on('window-all-closed', () => {

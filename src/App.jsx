@@ -139,6 +139,12 @@ export default function App() {
     [],
   );
 
+  // ---- falhas do processo principal viram aviso discreto, não caixa de erro crua
+  useEffect(
+    () => window.api.onMainError((msg) => notify(`Falha interna: ${msg}`, 'err')),
+    [notify],
+  );
+
   // ---- estado da atualização
   useEffect(() => {
     window.api.updateState().then((s) => s && setUpdate(s));

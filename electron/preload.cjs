@@ -38,6 +38,11 @@ contextBridge.exposeInMainWorld('api', {
     ipcRenderer.on('dialog:ask', h);
     return () => ipcRenderer.removeListener('dialog:ask', h);
   },
+  onMainError: (cb) => {
+    const h = (_e, msg) => cb(msg);
+    ipcRenderer.on('main:error', h);
+    return () => ipcRenderer.removeListener('main:error', h);
+  },
   dialogShown: (id) => ipcRenderer.send('dialog:shown', id),
   dialogAnswer: (payload) => ipcRenderer.send('dialog:answer', payload),
 

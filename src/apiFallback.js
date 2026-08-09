@@ -22,6 +22,7 @@ const fallback = {
   sendOverlayResult: () => {},
   cancelOverlay: () => {},
   onDialogRequest: () => () => {},
+  onMainError: () => () => {},
   dialogShown: () => {},
   dialogAnswer: () => {},
   docInfo: async () => ({ docId: 'web', windowCount: 1 }),
