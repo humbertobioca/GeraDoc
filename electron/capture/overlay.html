@@ -1,0 +1,232 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Selecionar área</title>
+    <style>
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      html, body {
+        width: 100%; height: 100%; overflow: hidden;
+        cursor: crosshair; background: #000;
+        font-family: "Segoe UI", system-ui, sans-serif; user-select: none;
+      }
+      #shot {
+        position: absolute; inset: 0; width: 100%; height: 100%;
+        object-fit: fill; -webkit-user-drag: none; pointer-events: none;
+      }
+      #veil {
+        position: absolute; inset: 0; background: rgba(0, 0, 0, 0.5);
+        pointer-events: none;
+      }
+      /* a "janela" recortada usa box-shadow gigante para escurecer o resto */
+      #sel {
+        position: absolute; display: none; pointer-events: none;
+        border: 1px solid #4da3ff;
+        box-shadow: 0 0 0 100vmax rgba(0, 0, 0, 0.5);
+        outline: 1px solid rgba(255, 255, 255, 0.35);
+      }
+      .handle {
+        position: absolute; width: 7px; height: 7px; background: #4da3ff;
+        border: 1px solid #fff; border-radius: 1px;
+      }
+      .h-nw { left: -4px; top: -4px; }      .h-n  { left: calc(50% - 4px); top: -4px; }
+      .h-ne { right: -4px; top: -4px; }     .h-e  { right: -4px; top: calc(50% - 4px); }
+      .h-se { right: -4px; bottom: -4px; }  .h-s  { left: calc(50% - 4px); bottom: -4px; }
+      .h-sw { left: -4px; bottom: -4px; }   .h-w  { left: -4px; top: calc(50% - 4px); }
+
+      #size {
+        position: absolute; display: none; pointer-events: none;
+        background: rgba(18, 21, 28, 0.92); color: #e8edf5;
+        font-size: 12px; padding: 3px 8px; border-radius: 4px;
+        font-variant-numeric: tabular-nums; border: 1px solid rgba(255,255,255,.15);
+      }
+      #hint {
+        position: absolute; left: 50%; top: 24px; transform: translateX(-50%);
+        background: rgba(18, 21, 28, 0.9); color: #cfd8e6; font-size: 13px;
+        padding: 9px 16px; border-radius: 8px; border: 1px solid rgba(255,255,255,.12);
+        pointer-events: none; letter-spacing: .2px;
+      }
+      #hint b { color: #fff; }
+      #hint.gone { display: none; }
+      #mon {
+        display: none; background: #4da3ff; color: #08131f; font-weight: 700;
+        font-size: 11px; padding: 2px 8px; border-radius: 20px; margin-right: 10px;
+      }
+      #mon.show { display: inline-block; }
+      #bar {
+        position: absolute; display: none; gap: 6px; z-index: 5;
+        background: rgba(18, 21, 28, 0.96); padding: 6px; border-radius: 8px;
+        border: 1px solid rgba(255,255,255,.14); box-shadow: 0 6px 24px rgba(0,0,0,.5);
+      }
+      #bar button {
+        cursor: pointer; border: 0; border-radius: 5px; padding: 7px 13px;
+        font-size: 12.5px; font-weight: 600; font-family: inherit;
+      }
+      .ok { background: #2f7d32; color: #fff; }
+      .ok:hover { background: #379a3b; }
+      .no { background: #3a4150; color: #dfe5ee; }
+      .no:hover { background: #4a5262; }
+      /* linhas-guia que seguem o cursor antes da seleção */
+      .guide { position: absolute; background: rgba(77,163,255,.5); pointer-events: none; }
+      #gv { width: 1px; height: 100%; top: 0; }
+      #gh { height: 1px; width: 100%; left: 0; }
+    </style>
+  </head>
+  <body>
+    <img id="shot" alt="" />
+    <div id="veil"></div>
+    <div class="guide" id="gv"></div>
+    <div class="guide" id="gh"></div>
+    <div id="sel">
+      <span class="handle h-nw"></span><span class="handle h-n"></span><span class="handle h-ne"></span>
+      <span class="handle h-e"></span><span class="handle h-se"></span><span class="handle h-s"></span>
+      <span class="handle h-sw"></span><span class="handle h-w"></span>
+    </div>
+    <div id="size"></div>
+    <div id="hint">
+      <span id="mon"></span>
+      Arraste para selecionar a área &nbsp;·&nbsp; <b>Enter</b> confirma &nbsp;·&nbsp;
+      <b>Ctrl+A</b> tela inteira &nbsp;·&nbsp; <b>Esc</b> cancela
+    </div>
+    <div id="bar">
+      <button class="no" id="btnCancel">Cancelar (Esc)</button>
+      <button class="ok" id="btnOk">Continuar &rarr;</button>
+    </div>
+
+    <script>
+      const el = (id) => document.getElementById(id);
+      const shot = el('shot'), sel = el('sel'), sizeTag = el('size');
+      const bar = el('bar'), hint = el('hint'), gv = el('gv'), gh = el('gh');
+
+      let img = null;      // HTMLImageElement em resolução nativa
+      let scaleX = 1, scaleY = 1;  // px nativos por px de tela
+      let dragging = false, done = false;
+      let x0 = 0, y0 = 0, rect = null;
+
+      window.api.onOverlayImage(({ dataUrl, index, total }) => {
+        shot.src = dataUrl;
+        img = new Image();
+        img.onload = () => {
+          scaleX = img.naturalWidth / window.innerWidth;
+          scaleY = img.naturalHeight / window.innerHeight;
+        };
+        img.src = dataUrl;
+
+        // com mais de um monitor, mostra em qual você está
+        if (total > 1) {
+          const mon = el('mon');
+          mon.textContent = `Monitor ${index} de ${total}`;
+          mon.classList.add('show');
+        }
+      });
+
+      function norm(ax, ay, bx, by) {
+        return {
+          x: Math.min(ax, bx), y: Math.min(ay, by),
+          w: Math.abs(bx - ax), h: Math.abs(by - ay),
+        };
+      }
+
+      function drawSel(r) {
+        rect = r;
+        sel.style.display = 'block';
+        sel.style.left = r.x + 'px';
+        sel.style.top = r.y + 'px';
+        sel.style.width = r.w + 'px';
+        sel.style.height = r.h + 'px';
+
+        sizeTag.style.display = 'block';
+        sizeTag.textContent =
+          Math.round(r.w * scaleX) + ' × ' + Math.round(r.h * scaleY) + ' px';
+        const ty = r.y > 30 ? r.y - 26 : r.y + r.h + 8;
+        sizeTag.style.left = Math.max(4, r.x) + 'px';
+        sizeTag.style.top = ty + 'px';
+      }
+
+      function showBar() {
+        if (!rect || rect.w < 3 || rect.h < 3) return;
+        bar.style.display = 'flex';
+        const bw = 240, bh = 42;
+        let bx = rect.x + rect.w - bw;
+        let by = rect.y + rect.h + 10;
+        if (by + bh > window.innerHeight) by = Math.max(4, rect.y - bh - 10);
+        bar.style.left = Math.max(4, Math.min(bx, window.innerWidth - bw - 4)) + 'px';
+        bar.style.top = by + 'px';
+      }
+
+      document.addEventListener('mousedown', (e) => {
+        if (e.button !== 0 || done) return;
+        if (bar.contains(e.target)) return;
+        dragging = true;
+        bar.style.display = 'none';
+        hint.classList.add('gone');
+        gv.style.display = gh.style.display = 'none';
+        x0 = e.clientX; y0 = e.clientY;
+        drawSel(norm(x0, y0, x0, y0));
+      });
+
+      document.addEventListener('mousemove', (e) => {
+        if (dragging) {
+          drawSel(norm(x0, y0, e.clientX, e.clientY));
+        } else if (!rect) {
+          gv.style.left = e.clientX + 'px';
+          gh.style.top = e.clientY + 'px';
+        }
+      });
+
+      // Ao passar o cursor para outro monitor, aquela janela assume o foco —
+      // senão Esc e Enter continuariam respondendo na tela anterior.
+      document.addEventListener('mouseenter', () => {
+        if (!dragging && !done) window.api.focusOverlay();
+      });
+
+      document.addEventListener('mouseup', () => {
+        if (!dragging) return;
+        dragging = false;
+        if (!rect || rect.w < 5 || rect.h < 5) {
+          sel.style.display = 'none';
+          sizeTag.style.display = 'none';
+          hint.classList.remove('gone');
+          gv.style.display = gh.style.display = 'block';
+          rect = null;
+          return;
+        }
+        showBar();
+      });
+
+      function selectAll() {
+        drawSel({ x: 0, y: 0, w: window.innerWidth, h: window.innerHeight });
+        hint.classList.add('gone');
+        gv.style.display = gh.style.display = 'none';
+        showBar();
+      }
+
+      function confirmSel() {
+        if (done || !rect || !img || rect.w < 5 || rect.h < 5) return;
+        done = true;
+        const c = document.createElement('canvas');
+        c.width = Math.round(rect.w * scaleX);
+        c.height = Math.round(rect.h * scaleY);
+        const ctx = c.getContext('2d');
+        ctx.drawImage(
+          img,
+          Math.round(rect.x * scaleX), Math.round(rect.y * scaleY),
+          c.width, c.height,
+          0, 0, c.width, c.height,
+        );
+        window.api.sendOverlayResult(c.toDataURL('image/png'));
+      }
+
+      el('btnOk').addEventListener('click', confirmSel);
+      el('btnCancel').addEventListener('click', () => window.api.cancelOverlay());
+      document.addEventListener('dblclick', confirmSel);
+
+      document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') window.api.cancelOverlay();
+        else if (e.key === 'Enter') confirmSel();
+        else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'a') { e.preventDefault(); selectAll(); }
+      });
+      document.addEventListener('contextmenu', (e) => { e.preventDefault(); window.api.cancelOverlay(); });
+    </script>
+  </body>
+</html>

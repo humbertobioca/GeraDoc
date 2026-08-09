@@ -1,0 +1,8 @@
+node_modules/
+dist/
+release/
+
+# nunca versionar chaves de assinatura
+build/certificado.pfx
+*.pfx
+*.p12

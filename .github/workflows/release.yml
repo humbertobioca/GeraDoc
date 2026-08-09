@@ -1,0 +1,60 @@
+name: Publicar release
+
+# Dispara ao enviar uma tag de versão (ex.: git tag v1.1.0 && git push origin v1.1.0)
+# ou manualmente pela aba Actions do GitHub.
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write # necessário para o electron-builder criar a release
+
+jobs:
+  windows:
+    runs-on: windows-latest
+
+    steps:
+      - name: Baixar o código
+        uses: actions/checkout@v4
+
+      - name: Preparar o Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Instalar dependências
+        run: npm ci
+
+      - name: Conferir se a tag bate com a versão do package.json
+        shell: bash
+        run: |
+          if [ "${GITHUB_REF_TYPE}" = "tag" ]; then
+            tag="${GITHUB_REF_NAME#v}"
+            pkg=$(node -p "require('./package.json').version")
+            if [ "$tag" != "$pkg" ]; then
+              echo "A tag v$tag não bate com a versão $pkg do package.json." >&2
+              exit 1
+            fi
+          fi
+
+      # build/icon.ico é versionado — gerar aqui exigiria uma janela gráfica,
+      # que o runner não tem. Para mudar o desenho, rode `npm run icon` local.
+
+      - name: Compilar e publicar
+        # O electron-builder gera latest.yml, o instalador e o blockmap,
+        # e sobe tudo para a release da tag. É latest.yml que o app consulta.
+        run: npm run release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Guardar os instaladores como artefato
+        uses: actions/upload-artifact@v4
+        with:
+          name: instaladores
+          path: |
+            release/*.exe
+            release/latest.yml
+          retention-days: 14

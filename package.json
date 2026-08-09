@@ -1,0 +1,103 @@
+{
+  "name": "geradoc",
+  "version": "1.0.0",
+  "private": true,
+  "description": "GeraDoc: gerador de documentos de teste com captura de tela, marcacoes, template editavel e exportacao Word/PDF",
+  "author": "Humberto",
+  "main": "electron/main.cjs",
+  "type": "module",
+  "scripts": {
+    "dev": "concurrently -k -n VITE,ELECTRON -c cyan,magenta \"vite\" \"wait-on tcp:5173 && cross-env NODE_ENV=development electron .\"",
+    "dev:web": "vite",
+    "icon": "electron tools/make-icon.cjs",
+    "build": "vite build",
+    "start": "npm run build && electron .",
+    "dist": "npm run build && electron-builder",
+    "release": "npm run build && electron-builder --publish always"
+  },
+  "dependencies": {
+    "docx": "^9.5.1",
+    "electron-updater": "^6.8.9",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "zustand": "^5.0.3"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^4.3.4",
+    "concurrently": "^9.1.2",
+    "cross-env": "^7.0.3",
+    "electron": "^33.3.1",
+    "electron-builder": "^25.1.8",
+    "vite": "^6.0.7",
+    "wait-on": "^8.0.2"
+  },
+  "build": {
+    "appId": "br.com.humberto.geradoc",
+    "productName": "GeraDoc",
+    "copyright": "Humberto",
+    "directories": {
+      "output": "release",
+      "buildResources": "build"
+    },
+    "files": [
+      "dist/**/*",
+      "electron/**/*",
+      "build/icon.ico"
+    ],
+    "asarUnpack": [
+      "build/icon.ico"
+    ],
+    "fileAssociations": [
+      {
+        "ext": "evid",
+        "name": "Documento do GeraDoc",
+        "description": "Documento de teste do GeraDoc",
+        "icon": "build/icon.ico",
+        "role": "Editor"
+      }
+    ],
+    "win": {
+      "icon": "build/icon.ico",
+      "target": [
+        "nsis",
+        "portable"
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowElevation": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "GeraDoc",
+      "deleteAppDataOnUninstall": false,
+      "runAfterFinish": true,
+      "installerLanguages": [
+        "pt_BR"
+      ],
+      "artifactName": "GeraDoc-${version}-Instalador.${ext}",
+      "differentialPackage": true
+    },
+    "portable": {
+      "artifactName": "GeraDoc-${version}-Portatil.${ext}",
+      "unicode": true
+    },
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "humbertobioca",
+        "repo": "GeraDoc",
+        "releaseType": "release"
+      }
+    ]
+  },
+  "allowScripts": {
+    "electron@33.4.11": true,
+    "esbuild@0.25.12": true
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/humbertobioca/GeraDoc.git"
+  }
+}
