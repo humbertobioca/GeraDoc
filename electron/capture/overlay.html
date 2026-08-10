@@ -103,13 +103,25 @@
       let dragging = false, done = false;
       let x0 = 0, y0 = 0, rect = null;
 
+      /**
+       * Quantos pixels da imagem original valem 1 pixel desta janela. Precisa
+       * ser recalculado se a janela mudar de tamanho: o processo principal
+       * reaplica os limites para cobrir a barra de tarefas, e uma escala velha
+       * deslocaria o recorte.
+       */
+      function recalcEscala() {
+        if (!img || !img.naturalWidth) return;
+        scaleX = img.naturalWidth / window.innerWidth;
+        scaleY = img.naturalHeight / window.innerHeight;
+        if (rect) drawSel(rect); // atualiza o tamanho mostrado em px
+      }
+
+      window.addEventListener('resize', recalcEscala);
+
       window.api.onOverlayImage(({ dataUrl, index, total }) => {
         shot.src = dataUrl;
         img = new Image();
-        img.onload = () => {
-          scaleX = img.naturalWidth / window.innerWidth;
-          scaleY = img.naturalHeight / window.innerHeight;
-        };
+        img.onload = recalcEscala;
         img.src = dataUrl;
 
         // com mais de um monitor, mostra em qual você está

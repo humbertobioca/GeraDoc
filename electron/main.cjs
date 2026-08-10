@@ -400,6 +400,14 @@ async function startCapture(requester = null) {
       overlayWindows.map(async (win, i) => {
         await win.loadFile(path.join(__dirname, 'capture', 'overlay.html'));
         if (win.isDestroyed()) return;
+
+        // O Windows encolhe janelas sem moldura até a área de trabalho, o que
+        // deixava a faixa da barra de tarefas de fora — e, pior, bagunçava a
+        // escala do recorte. Reaplicar os limites depois de exibida cobre a
+        // tela inteira. Feito antes de mandar a imagem, para o overlay já
+        // calcular a escala com o tamanho final.
+        win.setBounds(shots[i].display.bounds);
+
         win.webContents.send('overlay:image', {
           dataUrl: shots[i].dataUrl,
           index: i + 1,
